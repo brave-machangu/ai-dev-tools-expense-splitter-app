@@ -624,6 +624,11 @@ fieldset {
   min-width: 140px;
 }
 
+.setup-actions {
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line);
+}
+
 .preview-line {
   padding: var(--space-3);
   border-radius: var(--radius-sm);

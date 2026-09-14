@@ -38,6 +38,13 @@ export function GroupPage({ code }: { code: string }) {
 
   const [meId, setMeId] = useState<string | null>(() => readIdentity(code));
   const [identityNotice, setIdentityNotice] = useState<string | null>(null);
+  // Spec §8.1: the organiser adds every name first, then picks who they are. A
+  // group seen with no members starts in setup, and stays there until "Done".
+  const [addingPeople, setAddingPeople] = useState(false);
+
+  useEffect(() => {
+    if (snapshot && snapshot.members.length === 0) setAddingPeople(true);
+  }, [snapshot]);
 
   // F3: the stored identity must still be a member of the group.
   useEffect(() => {
@@ -114,15 +121,35 @@ export function GroupPage({ code }: { code: string }) {
 
   const header = <GroupHeader snapshot={snapshot} lastSyncFailed={lastSyncFailed} />;
 
-  // --- Setup: no members yet ------------------------------------------------
-  if (members.length === 0) {
+  // --- Setup: add everyone, then continue -----------------------------------
+  if (!me && (members.length === 0 || addingPeople)) {
     return (
       <div className="stack-lg">
         {header}
-        <section className="card">
-          <h2 className="section-title">Who's in this group?</h2>
-          <p className="muted">Add everyone's name (up to 8), including your own.</p>
+        <section className="card" aria-labelledby="setup-title">
+          <p className="eyebrow">Step 1 of 2</p>
+          <h2 id="setup-title" className="section-title">
+            Who's in this group?
+          </h2>
+          <p className="muted">
+            Add everyone's name (up to 8), including your own. When everyone's in, pick who you are.
+          </p>
           <MembersEditor snapshot={snapshot} meId={null} onSaved={commit} />
+          <div className="row-between setup-actions">
+            <span className="small muted">
+              {members.length === 0
+                ? "Add at least one name to continue."
+                : `${members.length} ${members.length === 1 ? "person" : "people"} added.`}
+            </span>
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={members.length === 0}
+              onClick={() => setAddingPeople(false)}
+            >
+              Done — pick who you are
+            </button>
+          </div>
         </section>
       </div>
     );
@@ -139,12 +166,12 @@ export function GroupPage({ code }: { code: string }) {
           notice={identityNotice}
           onPick={pickIdentity}
         />
-        <details className="card disclosure">
-          <summary>Missing someone, or a name typed wrong?</summary>
-          <div className="disclosure-body">
-            <MembersEditor snapshot={snapshot} meId={null} onSaved={commit} />
-          </div>
-        </details>
+        <section className="card" aria-labelledby="missing-title">
+          <h2 id="missing-title" className="section-title">
+            Missing someone, or a name typed wrong?
+          </h2>
+          <MembersEditor snapshot={snapshot} meId={null} onSaved={commit} />
+        </section>
       </div>
     );
   }
