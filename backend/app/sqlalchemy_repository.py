@@ -1,253 +1,221 @@
-"""Repository implementation on SQLAlchemy, for any database it supports."""
+"""The Repository protocol implemented with SQLAlchemy, for any database it supports."""
 
-from sqlalchemy import Engine, delete, exists, or_, select
-from sqlalchemy.orm import selectinload, sessionmaker
+from uuid import UUID
 
-from app.domain import (
-    ExpenseData,
-    ExpenseRecord,
-    GroupContents,
-    GroupRecord,
-    MemberRecord,
-    SettlementData,
-    SettlementRecord,
-    ShareRecord,
-)
-from app.models import (
-    ExpenseModel,
-    ExpenseShareModel,
-    GroupModel,
-    MemberModel,
-    SettlementModel,
-    utc_now,
-)
+from sqlalchemy import Engine, delete, select, update
+from sqlalchemy.orm import InstrumentedAttribute, Session, selectinload, sessionmaker
+
+from app.models import ExpenseRecord, GroupRecord, MemberRecord, SettlementRecord, ShareRecord
+from app.tables import ExpenseRow, ExpenseShareRow, GroupRow, MemberRow, SettlementRow
 
 
 class SqlAlchemyRepository:
+    """Each method runs in its own transaction and commits before returning.
+
+    Loaded records are built fresh from rows, so callers may mutate them; nothing
+    changes in the database until the record is saved.
+    """
+
     def __init__(self, engine: Engine) -> None:
-        self._session = sessionmaker(engine, expire_on_commit=False)
+        self._sessions = sessionmaker(engine)
 
-    # ------------------------------------------------------------------ groups
+    # --- groups ---------------------------------------------------------------
 
-    def code_exists(self, code: str) -> bool:
-        with self._session() as session:
-            return bool(session.scalar(select(exists().where(GroupModel.code == code))))
-
-    def create_group(self, *, code: str, name: str, currency: str) -> GroupRecord:
-        with self._session.begin() as session:
-            group = GroupModel(code=code, name=name, currency=currency)
-            session.add(group)
-            session.flush()
-            return _group_record(group)
+    def add_group(self, group: GroupRecord) -> None:
+        with self._sessions.begin() as session:
+            session.add(
+                GroupRow(
+                    id=group.id,
+                    code=group.code,
+                    name=group.name,
+                    currency=group.currency,
+                    created_at=group.created_at,
+                )
+            )
 
     def get_group_by_code(self, code: str) -> GroupRecord | None:
-        with self._session() as session:
-            group = session.scalar(select(GroupModel).where(GroupModel.code == code))
-            return None if group is None else _group_record(group)
-
-    def load_group_contents(self, group_id: str) -> GroupContents:
-        with self._session() as session:
-            members = [_member_record(m) for m in session.scalars(_members_query(group_id))]
-            positions = {m.id: m.position for m in members}
-            expenses = session.scalars(
-                select(ExpenseModel)
-                .where(ExpenseModel.group_id == group_id)
-                .options(selectinload(ExpenseModel.shares))
-                .order_by(ExpenseModel.created_at.desc(), ExpenseModel.id)
-            )
-            settlements = session.scalars(
-                select(SettlementModel)
-                .where(SettlementModel.group_id == group_id)
-                .order_by(SettlementModel.created_at.desc(), SettlementModel.id)
-            )
-            return GroupContents(
-                members=tuple(members),
-                expenses=tuple(_expense_record(e, positions) for e in expenses),
-                settlements=tuple(_settlement_record(s) for s in settlements),
+        with self._sessions() as session:
+            row = session.scalar(select(GroupRow).where(GroupRow.code == code))
+            if row is None:
+                return None
+            return GroupRecord(
+                id=row.id,
+                code=row.code,
+                name=row.name,
+                currency=row.currency,
+                created_at=row.created_at,
             )
 
-    # ----------------------------------------------------------------- members
+    # --- members --------------------------------------------------------------
 
-    def list_members(self, group_id: str) -> list[MemberRecord]:
-        with self._session() as session:
-            return [_member_record(m) for m in session.scalars(_members_query(group_id))]
+    def allocate_member_position(self, group_id: UUID) -> int:
+        with self._sessions.begin() as session:
+            return _take_next(session, group_id, GroupRow.next_member_position)
 
-    def add_member(self, group_id: str, name: str) -> MemberRecord:
-        with self._session.begin() as session:
-            # FOR UPDATE (where supported) stops two concurrent adds taking the same position.
-            group = session.get_one(GroupModel, group_id, with_for_update=True)
-            member = MemberModel(group_id=group_id, name=name, position=group.next_member_position)
-            group.next_member_position += 1
-            session.add(member)
-            session.flush()
-            return _member_record(member)
-
-    def rename_member(self, member_id: str, name: str) -> None:
-        with self._session.begin() as session:
-            session.get_one(MemberModel, member_id).name = name
-
-    def member_is_referenced(self, member_id: str) -> bool:
-        query = select(
-            or_(
-                exists().where(ExpenseModel.payer_member_id == member_id),
-                exists().where(ExpenseShareModel.member_id == member_id),
-                exists().where(
-                    or_(
-                        SettlementModel.from_member_id == member_id,
-                        SettlementModel.to_member_id == member_id,
-                    )
-                ),
+    def list_members(self, group_id: UUID) -> list[MemberRecord]:
+        with self._sessions() as session:
+            rows = session.scalars(
+                select(MemberRow).where(MemberRow.group_id == group_id).order_by(MemberRow.position)
             )
-        )
-        with self._session() as session:
-            return bool(session.scalar(query))
+            return [
+                MemberRecord(
+                    id=row.id,
+                    group_id=row.group_id,
+                    name=row.name,
+                    position=row.position,
+                    created_at=row.created_at,
+                )
+                for row in rows
+            ]
 
-    def delete_member(self, member_id: str) -> None:
-        with self._session.begin() as session:
-            session.execute(delete(MemberModel).where(MemberModel.id == member_id))
+    def save_member(self, member: MemberRecord) -> None:
+        with self._sessions.begin() as session:
+            row = session.get(MemberRow, member.id)
+            if row is None:
+                row = MemberRow(id=member.id, group_id=member.group_id)
+                session.add(row)
+            row.name = member.name
+            row.position = member.position
+            row.created_at = member.created_at
 
-    # ---------------------------------------------------------------- expenses
+    def delete_member(self, group_id: UUID, member_id: UUID) -> None:
+        with self._sessions.begin() as session:
+            session.execute(
+                delete(MemberRow).where(MemberRow.group_id == group_id, MemberRow.id == member_id)
+            )
 
-    def expense_exists(self, group_id: str, expense_id: str) -> bool:
-        query = select(
-            exists().where(ExpenseModel.id == expense_id, ExpenseModel.group_id == group_id)
-        )
-        with self._session() as session:
-            return bool(session.scalar(query))
+    # --- expenses -------------------------------------------------------------
 
-    def create_expense(self, group_id: str, data: ExpenseData) -> None:
-        now = utc_now()
-        with self._session.begin() as session:
-            expense = ExpenseModel(group_id=group_id, created_at=now, updated_at=now)
-            _apply_expense(expense, data)
-            expense.shares = _share_models(data)
-            session.add(expense)
+    def list_expenses(self, group_id: UUID) -> list[ExpenseRecord]:
+        with self._sessions() as session:
+            positions = {
+                member_id: position
+                for member_id, position in session.execute(
+                    select(MemberRow.id, MemberRow.position).where(MemberRow.group_id == group_id)
+                )
+            }
+            rows = session.scalars(
+                select(ExpenseRow)
+                .where(ExpenseRow.group_id == group_id)
+                .options(selectinload(ExpenseRow.shares))
+                .order_by(ExpenseRow.created_at.desc(), ExpenseRow.sort_seq.desc())
+            )
+            return [_expense_record(row, positions) for row in rows]
 
-    def update_expense(self, expense_id: str, data: ExpenseData) -> None:
-        with self._session.begin() as session:
-            expense = session.get_one(ExpenseModel, expense_id)
-            _apply_expense(expense, data)
-            expense.updated_at = utc_now()
-            # Delete the old rows before inserting the new ones: a member who stays
-            # in the split would otherwise briefly have two rows for this expense.
-            expense.shares.clear()
-            session.flush()
-            expense.shares.extend(_share_models(data))
+    def save_expense(self, expense: ExpenseRecord) -> None:
+        with self._sessions.begin() as session:
+            row = session.get(ExpenseRow, expense.id)
+            if row is None:
+                sort_seq = _take_next(session, expense.group_id, GroupRow.next_sort_seq)
+                row = ExpenseRow(id=expense.id, group_id=expense.group_id, sort_seq=sort_seq)
+                session.add(row)
+            else:
+                # Delete the old share rows before inserting the new ones: a member
+                # who stays in the split would otherwise briefly have two rows.
+                row.shares.clear()
+                session.flush()
+            row.payer_member_id = expense.payer_member_id
+            row.amount_cents = expense.amount_cents
+            row.description = expense.description
+            row.date = expense.date
+            row.split_type = expense.split_type
+            row.created_at = expense.created_at
+            row.updated_at = expense.updated_at
+            row.shares.extend(
+                ExpenseShareRow(
+                    id=share.id, member_id=share.member_id, amount_cents=share.amount_cents
+                )
+                for share in expense.shares
+            )
 
-    def delete_expense(self, expense_id: str) -> None:
-        with self._session.begin() as session:
+    def delete_expense(self, group_id: UUID, expense_id: UUID) -> None:
+        with self._sessions.begin() as session:
             # Share rows go with it through ON DELETE CASCADE.
-            session.execute(delete(ExpenseModel).where(ExpenseModel.id == expense_id))
-
-    # ------------------------------------------------------------- settlements
-
-    def settlement_exists(self, group_id: str, settlement_id: str) -> bool:
-        query = select(
-            exists().where(
-                SettlementModel.id == settlement_id, SettlementModel.group_id == group_id
+            session.execute(
+                delete(ExpenseRow).where(
+                    ExpenseRow.group_id == group_id, ExpenseRow.id == expense_id
+                )
             )
-        )
-        with self._session() as session:
-            return bool(session.scalar(query))
 
-    def create_settlement(self, group_id: str, data: SettlementData) -> None:
-        now = utc_now()
-        with self._session.begin() as session:
-            settlement = SettlementModel(group_id=group_id, created_at=now, updated_at=now)
-            _apply_settlement(settlement, data)
-            session.add(settlement)
+    # --- settlements ----------------------------------------------------------
 
-    def update_settlement(self, settlement_id: str, data: SettlementData) -> None:
-        with self._session.begin() as session:
-            settlement = session.get_one(SettlementModel, settlement_id)
-            _apply_settlement(settlement, data)
-            settlement.updated_at = utc_now()
+    def list_settlements(self, group_id: UUID) -> list[SettlementRecord]:
+        with self._sessions() as session:
+            rows = session.scalars(
+                select(SettlementRow)
+                .where(SettlementRow.group_id == group_id)
+                .order_by(SettlementRow.created_at.desc(), SettlementRow.sort_seq.desc())
+            )
+            return [
+                SettlementRecord(
+                    id=row.id,
+                    group_id=row.group_id,
+                    from_member_id=row.from_member_id,
+                    to_member_id=row.to_member_id,
+                    amount_cents=row.amount_cents,
+                    date=row.date,
+                    created_at=row.created_at,
+                    updated_at=row.updated_at,
+                )
+                for row in rows
+            ]
 
-    def delete_settlement(self, settlement_id: str) -> None:
-        with self._session.begin() as session:
-            session.execute(delete(SettlementModel).where(SettlementModel.id == settlement_id))
+    def save_settlement(self, settlement: SettlementRecord) -> None:
+        with self._sessions.begin() as session:
+            row = session.get(SettlementRow, settlement.id)
+            if row is None:
+                sort_seq = _take_next(session, settlement.group_id, GroupRow.next_sort_seq)
+                row = SettlementRow(
+                    id=settlement.id, group_id=settlement.group_id, sort_seq=sort_seq
+                )
+                session.add(row)
+            row.from_member_id = settlement.from_member_id
+            row.to_member_id = settlement.to_member_id
+            row.amount_cents = settlement.amount_cents
+            row.date = settlement.date
+            row.created_at = settlement.created_at
+            row.updated_at = settlement.updated_at
 
-
-# ---------------------------------------------------------------------------
-# Row <-> record mapping
-# ---------------------------------------------------------------------------
-
-
-def _members_query(group_id: str):  # noqa: ANN202
-    return select(MemberModel).where(MemberModel.group_id == group_id).order_by(MemberModel.position)
-
-
-def _apply_expense(expense: ExpenseModel, data: ExpenseData) -> None:
-    expense.payer_member_id = data.payer_member_id
-    expense.amount_cents = data.amount_cents
-    expense.description = data.description
-    expense.date = data.date
-    expense.split_type = data.split_type
-
-
-def _share_models(data: ExpenseData) -> list[ExpenseShareModel]:
-    return [
-        ExpenseShareModel(member_id=member_id, amount_cents=amount_cents)
-        for member_id, amount_cents in data.shares
-    ]
-
-
-def _apply_settlement(settlement: SettlementModel, data: SettlementData) -> None:
-    settlement.from_member_id = data.from_member_id
-    settlement.to_member_id = data.to_member_id
-    settlement.amount_cents = data.amount_cents
-    settlement.date = data.date
+    def delete_settlement(self, group_id: UUID, settlement_id: UUID) -> None:
+        with self._sessions.begin() as session:
+            session.execute(
+                delete(SettlementRow).where(
+                    SettlementRow.group_id == group_id, SettlementRow.id == settlement_id
+                )
+            )
 
 
-def _group_record(group: GroupModel) -> GroupRecord:
-    return GroupRecord(
-        id=group.id,
-        code=group.code,
-        name=group.name,
-        currency=group.currency,
-        created_at=group.created_at,
-    )
+def _take_next(session: Session, group_id: UUID, counter: InstrumentedAttribute[int]) -> int:
+    """Returns one of the group's counters and increments it.
+
+    The UPDATE runs before the read, so the transaction holds the write lock (a
+    row lock on PostgreSQL) when it reads, and concurrent callers never get the
+    same number.
+    """
+    session.execute(update(GroupRow).where(GroupRow.id == group_id).values({counter: counter + 1}))
+    return session.execute(select(counter).where(GroupRow.id == group_id)).scalar_one() - 1
 
 
-def _member_record(member: MemberModel) -> MemberRecord:
-    return MemberRecord(
-        id=member.id,
-        group_id=member.group_id,
-        name=member.name,
-        position=member.position,
-        created_at=member.created_at,
-    )
-
-
-def _expense_record(expense: ExpenseModel, positions: dict[str, int]) -> ExpenseRecord:
-    shares = sorted(expense.shares, key=lambda s: positions.get(s.member_id, len(positions)))
+def _expense_record(row: ExpenseRow, positions: dict[UUID, int]) -> ExpenseRecord:
+    # Shares are listed in ascending member position (openapi Expense.shares).
+    shares = sorted(row.shares, key=lambda share: positions.get(share.member_id, len(positions)))
     return ExpenseRecord(
-        id=expense.id,
-        group_id=expense.group_id,
-        payer_member_id=expense.payer_member_id,
-        amount_cents=expense.amount_cents,
-        description=expense.description,
-        date=expense.date,
-        split_type=expense.split_type,
-        shares=tuple(
+        id=row.id,
+        group_id=row.group_id,
+        payer_member_id=row.payer_member_id,
+        amount_cents=row.amount_cents,
+        description=row.description,
+        date=row.date,
+        split_type=row.split_type,
+        created_at=row.created_at,
+        updated_at=row.updated_at,
+        shares=[
             ShareRecord(
-                id=s.id, expense_id=s.expense_id, member_id=s.member_id, amount_cents=s.amount_cents
+                id=share.id,
+                expense_id=share.expense_id,
+                member_id=share.member_id,
+                amount_cents=share.amount_cents,
             )
-            for s in shares
-        ),
-        created_at=expense.created_at,
-        updated_at=expense.updated_at,
-    )
-
-
-def _settlement_record(settlement: SettlementModel) -> SettlementRecord:
-    return SettlementRecord(
-        id=settlement.id,
-        group_id=settlement.group_id,
-        from_member_id=settlement.from_member_id,
-        to_member_id=settlement.to_member_id,
-        amount_cents=settlement.amount_cents,
-        date=settlement.date,
-        created_at=settlement.created_at,
-        updated_at=settlement.updated_at,
+            for share in shares
+        ],
     )

@@ -25,7 +25,6 @@ _docs/specs.md              Product specification (source of truth)
 frontend/                   React + TypeScript + Vite, plain CSS
   src/types.ts              ALL domain and API types — the only place they are defined
   src/api/client.ts         THE single API client module (see rule below)
-  src/api/mock/             In-memory mock server; imported ONLY by client.ts
   src/domain/               Pure logic: money parsing/formatting, split + balance maths
   src/hooks/                React hooks (snapshot polling)
   src/lib/                  Small browser helpers (identity in localStorage, routing)
@@ -33,14 +32,17 @@ frontend/                   React + TypeScript + Vite, plain CSS
   src/pages/                Top-level screens (home, group)
   src/styles/global.css     Design tokens and all styles
 backend/                    FastAPI service, managed with uv
-  app/main.py               create_app(repository): wiring, CORS, error handlers
+  app/main.py               create_app(repository): wiring, CORS, error handlers, startup
   app/routes.py             One thin handler per operation in _docs/openapi.yaml
   app/schemas.py            Pydantic request/response models (mirror openapi.yaml)
   app/service.py            Business rules; talks to storage only via Repository
-  app/repository.py         Repository protocol + InMemoryRepository (mock database)
+  app/repository.py         Repository protocol + InMemoryRepository
+  app/sqlalchemy_repository.py  SqlAlchemyRepository, the one the running server uses
+  app/database.py           DATABASE_URL, engine setup, create_schema
+  app/tables.py             SQLAlchemy tables (portable column types only)
+  app/models.py             Storage records (dataclasses) both repositories load and save
   app/calc.py               Pure split/balance maths (must match frontend results)
-  app/models.py             Storage records (dataclasses)
-  tests/                    Endpoint tests via TestClient, checked against openapi.yaml
+  tests/                    Endpoint tests via TestClient, run against both repositories
 ```
 
 Run frontend commands from `frontend/` and backend commands from `backend/`.
@@ -53,6 +55,28 @@ Run frontend commands from `frontend/` and backend commands from `backend/`.
   tools). Run everything through `uv run …`. Never `pip install` directly; commit
   `uv.lock`.
 
+## Configuration
+
+All settings are environment variables with working local defaults.
+
+| Variable | Read by | Default | Purpose |
+|---|---|---|---|
+| `DATABASE_URL` | backend | SQLite file `backend/prorata.db` | SQLAlchemy URL of the database the server uses |
+| `TEST_DATABASE_URL` | `uv run pytest` | Throwaway SQLite file in pytest's temp dir | Database for the `[sqlalchemy]` test runs; must differ from `DATABASE_URL` |
+| `PRORATA_CORS_ORIGINS` | backend | `http://localhost:5173` | Comma-separated browser origins allowed by CORS |
+| `VITE_API_BASE_URL` | frontend (build time) | `http://localhost:8000` | Backend base URL, no trailing slash; see `frontend/.env.example` |
+
+- The default SQLite path is anchored to `backend/`, so starting the server from another
+  directory never creates a second, empty database.
+- PostgreSQL is a configuration change, not a code change: run
+  `uv add "psycopg[binary]"`, then set
+  `DATABASE_URL=postgresql+psycopg://user:pass@localhost:5432/prorata`.
+- Tables are created at server startup with `create_all`, which never alters existing
+  tables. There are no migrations (no Alembic yet), so after changing `app/tables.py`
+  delete `backend/prorata.db` or add a migration tool.
+- The test suite drops and recreates every table in `TEST_DATABASE_URL`. Only point it at
+  a database you're happy to lose. The suite refuses to run if it equals `DATABASE_URL`.
+
 ## The API client rule
 
 **All backend calls from the frontend go through `frontend/src/api/client.ts`.**
@@ -60,10 +84,9 @@ Run frontend commands from `frontend/` and backend commands from `backend/`.
 - No `fetch`, `axios`, `XMLHttpRequest` or other HTTP calls anywhere else in the
   frontend. Components, hooks and pages import `api` from `src/api/client.ts` and
   nothing lower. ESLint enforces this.
-- Until the backend exists, `client.ts` delegates to the in-memory mock in
-  `src/api/mock/`. Switching to the real backend means rewriting the bodies in
-  `client.ts` only — function signatures and return types must stay the same — and
-  then deleting `src/api/mock/`.
+- `client.ts` calls the FastAPI backend with `fetch` at `VITE_API_BASE_URL`. Its
+  function signatures and return types are the contract the rest of the frontend relies
+  on; change them only together with `_docs/openapi.yaml` and the backend.
 - New endpoints are added to `client.ts` first, matching §9 of the spec.
   `openapi.yaml` is derived from this module.
 
@@ -95,9 +118,9 @@ Run frontend commands from `frontend/` and backend commands from `backend/`.
 
 - Python with type hints throughout; Pydantic models for request/response bodies.
 - Format and lint with Ruff: `uv run ruff format` and `uv run ruff check`.
-- All persistence sits behind a repository interface from the first commit: an
-  in-memory implementation first, SQLAlchemy later. Routes never touch the storage
-  layer directly.
+- All persistence sits behind the `Repository` protocol, with two implementations:
+  `InMemoryRepository` and `SqlAlchemyRepository`. A storage change must keep both
+  passing the same suite. Routes never touch the storage layer directly.
 - SQLAlchemy models use only portable column types (no database-specific types).
 - Status codes follow the spec: `404` unknown code/id, `422` validation, `409` member
   delete blocked by references.
@@ -118,14 +141,18 @@ No unit test runner is configured yet. If you add one, use Vitest and expose it 
 ### Backend (from `backend/`)
 
 ```sh
-uv run pytest         # full test suite
-uv run ruff check     # lint
+uv run fastapi dev app/main.py   # dev server on http://localhost:8000 (API docs at /docs)
+uv run pytest                    # full test suite
+uv run ruff check                # lint
 uv run ruff format --check
 ```
 
 - Write endpoint tests **before** endpoint implementations.
 - Endpoint tests hit the HTTP surface only (FastAPI `TestClient`), never the
-  repository, so the same suite passes after the in-memory → SQLAlchemy swap.
+  repository. The `client` fixture runs every endpoint test twice, as `[memory]` and
+  `[sqlalchemy]`, and both must pass.
+- `uv run pytest` never touches the dev database; see `TEST_DATABASE_URL` under
+  Configuration.
 - Required properties: the share-sum invariant holds for every expense, and group nets
   sum to exactly zero.
 

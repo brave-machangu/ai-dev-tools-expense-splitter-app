@@ -29,12 +29,53 @@ backend/    FastAPI service
 
 ### Prerequisites
 
-<!-- TODO: Node.js version, uv install -->
-
-### Frontend
-
-<!-- TODO: install and run instructions -->
+- [uv](https://docs.astral.sh/uv/getting-started/installation/). It installs the Python
+  version the backend needs (3.14, from `backend/.python-version`) if it's missing.
+- Node.js 20.19+ or 22.12+ (required by Vite), with npm.
 
 ### Backend
 
-<!-- TODO: install, run, and test instructions -->
+```sh
+cd backend
+uv sync
+uv run fastapi dev app/main.py   # http://localhost:8000, API docs at /docs
+```
+
+Data is stored in SQLite at `backend/prorata.db`, which is created on first start and
+survives restarts. Tests and lint:
+
+```sh
+uv run pytest        # every endpoint test runs against both in-memory and SQL storage
+uv run ruff check
+```
+
+### Frontend
+
+Start the backend first, then:
+
+```sh
+cd frontend
+npm install
+npm run dev          # http://localhost:5173
+```
+
+The frontend expects the backend at `http://localhost:8000`. To point it elsewhere, copy
+`frontend/.env.example` to `frontend/.env.local` and set `VITE_API_BASE_URL`.
+
+## Configuration
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `DATABASE_URL` | SQLite file `backend/prorata.db` | SQLAlchemy URL of the backend database |
+| `TEST_DATABASE_URL` | Throwaway SQLite file in pytest's temp dir | Database for the SQL test runs |
+| `PRORATA_CORS_ORIGINS` | `http://localhost:5173` | Comma-separated origins the backend allows |
+| `VITE_API_BASE_URL` | `http://localhost:8000` | Backend base URL used by the frontend |
+
+**PostgreSQL.** No code changes: from `backend/`, run `uv add "psycopg[binary]"`, then
+set `DATABASE_URL=postgresql+psycopg://user:pass@localhost:5432/prorata`.
+
+**Schema changes.** Tables are created at startup, and existing tables are never altered.
+There are no migrations yet, so after changing the schema, delete `backend/prorata.db`.
+
+**Test database.** The suite drops and recreates every table in `TEST_DATABASE_URL`, so
+only use a database you're happy to lose. It refuses to run against `DATABASE_URL`.
