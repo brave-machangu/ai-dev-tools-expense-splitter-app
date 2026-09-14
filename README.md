@@ -20,9 +20,10 @@ in [`_docs/specs.md`](_docs/specs.md).
 ## Repository layout
 
 ```
-_docs/      Specification and project docs
-frontend/   React + Vite app
-backend/    FastAPI service
+openapi.yaml  API contract (OpenAPI 3.1) shared by frontend and backend
+_docs/        Specification and project docs
+frontend/     React + Vite app
+backend/      FastAPI service
 ```
 
 ## Getting started
@@ -40,6 +41,9 @@ cd backend
 uv sync
 uv run fastapi dev app/main.py   # http://localhost:8000, API docs at /docs
 ```
+
+`GET /` describes the API and links to the docs; `GET /health` returns
+`{"status": "ok"}` while the server is up.
 
 Data is stored in SQLite at `backend/prorata.db`, which is created on first start and
 survives restarts. Tests and lint:

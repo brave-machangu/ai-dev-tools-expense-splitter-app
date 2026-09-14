@@ -40,8 +40,52 @@ tags:
     description: Costs paid by one member and shared by others.
   - name: Settlements
     description: Recorded payments between two members.
+  - name: Service
+    description: API root and health check, for people and monitoring.
 
 paths:
+  /:
+    get:
+      tags: [Service]
+      operationId: getServiceInfo
+      summary: Describe the API
+      description: |
+        A small signpost for anyone who opens the server's root URL: the API
+        name and version, and where the interactive docs, the machine-readable
+        OpenAPI document and the health check live.
+      responses:
+        "200":
+          description: API name, version and useful links.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServiceInfo"
+              example:
+                name: ProRata API
+                version: 1.0.0
+                docs: /docs
+                openapi: /openapi.json
+                health: /health
+
+  /health:
+    get:
+      tags: [Service]
+      operationId: getHealth
+      summary: Health check
+      description: |
+        Liveness check: returns `200` with `{"status": "ok"}` whenever the
+        server process is up and handling requests. It does not query the
+        database.
+      responses:
+        "200":
+          description: The server is up.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+              example:
+                status: ok
+
   /api/groups:
     post:
       tags: [Groups]
@@ -810,6 +854,33 @@ components:
           $ref: "#/components/schemas/AmountCents"
         date:
           $ref: "#/components/schemas/CalendarDate"
+
+    # -------------------------------------------------------------- service
+    ServiceInfo:
+      type: object
+      required: [name, version, docs, openapi, health]
+      properties:
+        name:
+          type: string
+        version:
+          type: string
+        docs:
+          type: string
+          description: Path of the interactive API documentation.
+        openapi:
+          type: string
+          description: Path of the machine-readable OpenAPI document.
+        health:
+          type: string
+          description: Path of the health check.
+
+    HealthStatus:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          const: ok
 
     # --------------------------------------------------------------- errors
     Error:

@@ -1,4 +1,4 @@
-"""The implementation must expose exactly the operations in _docs/openapi.yaml."""
+"""The implementation must expose exactly the operations in openapi.yaml."""
 
 import re
 

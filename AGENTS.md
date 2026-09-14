@@ -21,6 +21,7 @@ it is the source of truth.
 ## Folder layout
 
 ```
+openapi.yaml                API contract (OpenAPI 3.1); tests validate responses against it
 _docs/specs.md              Product specification (source of truth)
 frontend/                   React + TypeScript + Vite, plain CSS
   src/types.ts              ALL domain and API types — the only place they are defined
@@ -33,7 +34,7 @@ frontend/                   React + TypeScript + Vite, plain CSS
   src/styles/global.css     Design tokens and all styles
 backend/                    FastAPI service, managed with uv
   app/main.py               create_app(repository): wiring, CORS, error handlers, startup
-  app/routes.py             One thin handler per operation in _docs/openapi.yaml
+  app/routes.py             One thin handler per operation in openapi.yaml
   app/schemas.py            Pydantic request/response models (mirror openapi.yaml)
   app/service.py            Business rules; talks to storage only via Repository
   app/repository.py         Repository protocol + InMemoryRepository
@@ -86,7 +87,7 @@ All settings are environment variables with working local defaults.
   nothing lower. ESLint enforces this.
 - `client.ts` calls the FastAPI backend with `fetch` at `VITE_API_BASE_URL`. Its
   function signatures and return types are the contract the rest of the frontend relies
-  on; change them only together with `_docs/openapi.yaml` and the backend.
+  on; change them only together with `openapi.yaml` (repository root) and the backend.
 - New endpoints are added to `client.ts` first, matching §9 of the spec.
   `openapi.yaml` is derived from this module.
 

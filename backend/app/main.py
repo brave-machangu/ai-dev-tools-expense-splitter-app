@@ -15,7 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.database import create_schema, database_url, make_engine
 from app.errors import register_error_handlers
 from app.repository import Repository
-from app.routes import router
+from app.routes import router, service_router
 from app.service import GroupService
 from app.sqlalchemy_repository import SqlAlchemyRepository
 
@@ -59,6 +59,7 @@ def create_app(repository: Repository | None = None) -> FastAPI:
         allow_headers=["Content-Type"],
     )
     register_error_handlers(app)
+    app.include_router(service_router)
     app.include_router(router)
     return app
 

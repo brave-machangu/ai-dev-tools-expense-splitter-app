@@ -1,4 +1,4 @@
-"""Request and response models, mirroring components/schemas in _docs/openapi.yaml.
+"""Request and response models, mirroring components/schemas in openapi.yaml.
 
 Request models enforce everything a single request can prove on its own (types,
 ranges, lengths, formats). Rules that need stored data — such as "the payer is a
@@ -168,3 +168,18 @@ class GroupSnapshot(ResponseModel):
 
 class ErrorResponse(BaseModel):
     detail: str
+
+
+# ------------------------------------------------------------------- service
+
+
+class ServiceInfo(BaseModel):
+    name: str
+    version: str
+    docs: str
+    openapi: str
+    health: str
+
+
+class HealthStatus(BaseModel):
+    status: Literal["ok"]

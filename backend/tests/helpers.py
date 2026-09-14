@@ -10,7 +10,7 @@ import yaml
 from fastapi.testclient import TestClient
 from jsonschema import Draft202012Validator
 
-OPENAPI_PATH = Path(__file__).resolve().parents[2] / "_docs" / "openapi.yaml"
+OPENAPI_PATH = Path(__file__).resolve().parents[2] / "openapi.yaml"
 CODE_RE = re.compile(r"[0-9A-HJKMNP-TV-Z]{8}")
 
 
@@ -20,7 +20,7 @@ def load_openapi() -> dict[str, Any]:
 
 
 def assert_matches_schema(body: Any, schema_name: str) -> None:
-    """Validate a response body against a schema in _docs/openapi.yaml."""
+    """Validate a response body against a schema in openapi.yaml (repository root)."""
     schema = {
         "$ref": f"#/components/schemas/{schema_name}",
         "components": load_openapi()["components"],

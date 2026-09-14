@@ -1,4 +1,4 @@
-"""HTTP routes — one per operation in _docs/openapi.yaml.
+"""HTTP routes — one per operation in openapi.yaml (repository root).
 
 Handlers stay thin: parse the request (FastAPI + schemas), call the service,
 return its result. Operation ids match the frontend's `api` client methods.
@@ -16,7 +16,9 @@ from app.schemas import (
     ErrorResponse,
     ExpenseInput,
     GroupSnapshot,
+    HealthStatus,
     MemberNameInput,
+    ServiceInfo,
     SettlementInput,
 )
 from app.service import GroupService
@@ -183,3 +185,35 @@ def delete_settlement(
     code: GroupCode, settlement_id: SettlementId, service: Service
 ) -> GroupSnapshot:
     return service.delete_settlement(code, settlement_id)
+
+
+# --- service -------------------------------------------------------------------
+
+service_router = APIRouter()
+
+
+@service_router.get(
+    "/",
+    tags=["Service"],
+    operation_id="getServiceInfo",
+    summary="Describe the API",
+)
+def get_service_info(request: Request) -> ServiceInfo:
+    app = request.app
+    return ServiceInfo(
+        name=app.title,
+        version=app.version,
+        docs=app.docs_url or "/docs",
+        openapi=app.openapi_url or "/openapi.json",
+        health="/health",
+    )
+
+
+@service_router.get(
+    "/health",
+    tags=["Service"],
+    operation_id="getHealth",
+    summary="Health check",
+)
+def get_health() -> HealthStatus:
+    return HealthStatus(status="ok")

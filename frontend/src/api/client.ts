@@ -2,7 +2,7 @@
  * THE API client. Every backend call in the frontend goes through this module;
  * nothing else may use fetch (ESLint enforces it).
  *
- * Talks to the FastAPI backend described in _docs/openapi.yaml. The base URL
+ * Talks to the FastAPI backend described in openapi.yaml. The base URL
  * comes from VITE_API_BASE_URL (see frontend/.env.example). Every failure —
  * an HTTP error, an unreachable server or a timeout — rejects with an ApiError
  * whose message can be shown to the user as-is.
