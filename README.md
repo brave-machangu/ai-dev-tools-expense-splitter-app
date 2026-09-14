@@ -9,11 +9,11 @@ specification lives in [`_docs/specs.md`](_docs/specs.md).
 
 ## Planned stack
 
-| Layer    | Technology                                                          |
-| -------- | ------------------------------------------------------------------- |
-| Frontend | React + Vite (TanStack Start / Router, Tailwind CSS), managed with npm |
-| Backend  | FastAPI, managed with [uv](https://docs.astral.sh/uv/)              |
-| Database | SQLite via SQLAlchemy (kept database-agnostic)                      |
+| Layer    | Technology                                                  |
+| -------- | ----------------------------------------------------------- |
+| Frontend | React + TypeScript + Vite, plain CSS, managed with npm      |
+| Backend  | FastAPI, managed with [uv](https://docs.astral.sh/uv/)      |
+| Database | SQLite via SQLAlchemy (kept database-agnostic)              |
 
 ## Repository layout
 

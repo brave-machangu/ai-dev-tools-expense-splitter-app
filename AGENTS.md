@@ -7,13 +7,18 @@ it is the source of truth.
 ## Folder layout
 
 ```
-_docs/specs.md      Product specification (source of truth)
-frontend/           React + Vite app (TanStack Start / Router, Tailwind, shadcn/ui)
-  src/lib/api.ts    THE single API client module (see rule below)
-  src/lib/          Pure logic: money, calc, identity, types, mock backend
-  src/components/   quits/ = app components, ui/ = generated shadcn primitives
-  src/routes/       File-based routes (routeTree.gen.ts is generated — never edit)
-backend/            FastAPI service, managed with uv (not started yet)
+_docs/specs.md              Product specification (source of truth)
+frontend/                   React + TypeScript + Vite, plain CSS
+  src/types.ts              ALL domain and API types — the only place they are defined
+  src/api/client.ts         THE single API client module (see rule below)
+  src/api/mock/             In-memory mock server; imported ONLY by client.ts
+  src/domain/               Pure logic: money parsing/formatting, split + balance maths
+  src/hooks/                React hooks (snapshot polling)
+  src/lib/                  Small browser helpers (identity in localStorage, routing)
+  src/components/           Reusable UI and group-screen components
+  src/pages/                Top-level screens (home, group)
+  src/styles/global.css     Design tokens and all styles
+backend/                    FastAPI service, managed with uv (not started yet)
 ```
 
 Run frontend commands from `frontend/` and backend commands from `backend/`.
@@ -28,17 +33,17 @@ Run frontend commands from `frontend/` and backend commands from `backend/`.
 
 ## The API client rule
 
-**All backend calls from the frontend go through `frontend/src/lib/api.ts`.**
+**All backend calls from the frontend go through `frontend/src/api/client.ts`.**
 
-- No `fetch`, `axios`, or other HTTP calls anywhere else in the frontend. Components,
-  hooks and routes import `api` from `@/lib/api` and nothing lower.
-- Until the backend exists, `api.ts` delegates to `src/lib/mock-backend.ts`. Switching
-  to the real backend means changing the bodies in `api.ts` only — function signatures
-  and return types must stay the same.
-- New endpoints are added to `api.ts` first, matching §9 of the spec. `openapi.yaml`
-  is derived from this module.
-- The only other `fetch` in the frontend is the SSR handler in `src/server.ts`; it is
-  not a backend call and must stay that way.
+- No `fetch`, `axios`, `XMLHttpRequest` or other HTTP calls anywhere else in the
+  frontend. Components, hooks and pages import `api` from `src/api/client.ts` and
+  nothing lower. ESLint enforces this.
+- Until the backend exists, `client.ts` delegates to the in-memory mock in
+  `src/api/mock/`. Switching to the real backend means rewriting the bodies in
+  `client.ts` only — function signatures and return types must stay the same — and
+  then deleting `src/api/mock/`.
+- New endpoints are added to `client.ts` first, matching §9 of the spec.
+  `openapi.yaml` is derived from this module.
 
 ## Code style
 
@@ -46,7 +51,7 @@ Run frontend commands from `frontend/` and backend commands from `backend/`.
 
 - **Money is integer minor units (cents) everywhere.** No floats for money in
   TypeScript, Python, or the database. Parse and format only at the UI edge
-  (`src/lib/money.ts` on the frontend).
+  (`src/domain/money.ts` on the frontend).
 - **Determinism matters.** Rounding remainders and transfer tie-breaks use member
   `position` (spec §7). Don't introduce ordering that depends on object/dict iteration
   or timestamps.
@@ -56,14 +61,13 @@ Run frontend commands from `frontend/` and backend commands from `backend/`.
 
 - Prettier config in `frontend/.prettierrc`: 100-char lines, double quotes,
   semicolons, trailing commas. ESLint config in `frontend/eslint.config.js`.
-- TypeScript is `strict` with `noUncheckedIndexedAccess` and
-  `exactOptionalPropertyTypes` — handle `undefined` rather than using `!` or `any`.
-- Import via the `@/` alias (maps to `frontend/src/`).
-- Don't hand-edit `src/components/ui/*` beyond small tweaks; put app UI in
-  `src/components/quits/`.
-- `vite.config.ts` uses `@lovable.dev/vite-tanstack-config`, which already registers
-  React, TanStack, Tailwind and path plugins. Don't add them again.
+- TypeScript is `strict` with `noUncheckedIndexedAccess` — handle `undefined` rather
+  than reaching for `!` or `any`.
+- Function components and hooks only. No UI framework or CSS framework: styles live in
+  `src/styles/global.css` and use its CSS custom properties (colour, spacing, radius).
+- Domain types are added to `src/types.ts`, never redeclared locally.
 - Every `localStorage` access is wrapped in try/catch (spec F3).
+- No `window.alert` / `confirm` / `prompt`; use in-app confirmation UI.
 
 ### Backend (Python / FastAPI)
 
@@ -81,9 +85,9 @@ Run frontend commands from `frontend/` and backend commands from `backend/`.
 ### Frontend (from `frontend/`)
 
 ```sh
-npm run lint          # ESLint + Prettier check
-npx tsc --noEmit      # type check
-npm run build         # production build
+npm run lint          # ESLint (includes the API client rule)
+npm run typecheck     # tsc --noEmit
+npm run build         # type check + production build
 ```
 
 No unit test runner is configured yet. If you add one, use Vitest and expose it as
