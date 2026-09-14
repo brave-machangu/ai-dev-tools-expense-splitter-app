@@ -48,13 +48,13 @@ export function ExpenseDetailDialog({
       onClose={onClose}
     >
       <div className="flex items-baseline justify-between border-b border-line pb-4">
-        <span className="text-muted text-xs font-medium">Total</span>
+        <span className="text-muted-foreground text-xs font-medium">Total</span>
         <span className="font-ledger text-3xl font-semibold">
           {formatMoney(expense.amount_cents, currency)}
         </span>
       </div>
 
-      <p className="text-muted mt-4 text-xs font-medium">Charged to</p>
+      <p className="text-muted-foreground mt-4 text-xs font-medium">Charged to</p>
       <div className="mt-2 divide-y divide-line rounded-lg border border-line bg-paper px-3">
         {orderedShares.map((share) => (
           <div key={share.id} className="flex items-center justify-between py-2.5">
@@ -63,7 +63,7 @@ export function ExpenseDetailDialog({
           </div>
         ))}
       </div>
-      <p className="text-muted mt-2 text-xs">
+      <p className="text-muted-foreground mt-2 text-xs">
         Odd pennies go to whoever joined the group first, always in the same order.
       </p>
 

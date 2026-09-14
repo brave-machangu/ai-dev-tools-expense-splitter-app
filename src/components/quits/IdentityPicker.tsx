@@ -15,7 +15,7 @@ export function IdentityPicker({
   return (
     <div className="mx-auto max-w-lg rounded-xl border border-line bg-card p-6">
       <h2 className="font-ledger text-lg font-semibold">Who are you?</h2>
-      <p className="text-muted mt-1 text-xs">
+      <p className="text-muted-foreground mt-1 text-xs">
         Pick your name. This browser remembers it, so you only do this once.
       </p>
       {notice ? (
@@ -24,7 +24,7 @@ export function IdentityPicker({
 
       {members.length === 0 ? (
         <div className="mt-5">
-          <p className="text-muted text-sm">Nobody has been added to this group yet.</p>
+          <p className="text-muted-foreground text-sm">Nobody has been added to this group yet.</p>
           <button
             type="button"
             onClick={onAddPeople}
@@ -49,7 +49,7 @@ export function IdentityPicker({
           <button
             type="button"
             onClick={onAddPeople}
-            className="text-muted w-full rounded-lg border border-line px-4 py-2.5 text-xs font-semibold"
+            className="text-muted-foreground w-full rounded-lg border border-line px-4 py-2.5 text-xs font-semibold"
           >
             I&apos;m not on this list — add people
           </button>

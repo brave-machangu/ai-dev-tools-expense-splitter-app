@@ -91,7 +91,7 @@ function GroupPage() {
     return (
       <Centered>
         <h1 className="font-ledger text-3xl font-semibold">No group with that link</h1>
-        <p className="text-muted mt-3 text-sm">
+        <p className="text-muted-foreground mt-3 text-sm">
           The code <span className="tnum">{code}</span> doesn&apos;t match any group. Check the link
           you were sent, or start a new group.
         </p>
@@ -109,7 +109,7 @@ function GroupPage() {
     return (
       <Centered>
         <h1 className="font-ledger text-2xl font-semibold">This group didn&apos;t load</h1>
-        <p className="text-muted mt-3 text-sm">Check your connection and try again.</p>
+        <p className="text-muted-foreground mt-3 text-sm">Check your connection and try again.</p>
       </Centered>
     );
   }
@@ -117,7 +117,7 @@ function GroupPage() {
   if (!snapshot) {
     return (
       <Centered>
-        <p className="text-muted text-sm">Loading the group…</p>
+        <p className="text-muted-foreground text-sm">Loading the group…</p>
       </Centered>
     );
   }
@@ -153,7 +153,7 @@ function GroupPage() {
             <QuitsMark />
             <div>
               <p className="font-ledger text-xl leading-none font-semibold">{snapshot.group.name}</p>
-              <p className="text-muted mt-1 text-xs">
+              <p className="text-muted-foreground mt-1 text-xs">
                 {members.length} {members.length === 1 ? "person" : "people"} · {currency}
               </p>
             </div>
@@ -164,7 +164,7 @@ function GroupPage() {
               onClick={copyLink}
               className="flex flex-col items-end rounded-lg px-2 py-1 text-right hover:bg-card"
             >
-              <span className="text-muted text-xs">Copy invite link</span>
+              <span className="text-muted-foreground text-xs">Copy invite link</span>
               <span className="tnum text-xs tracking-[0.14em]">code · {snapshot.group.code}</span>
             </button>
             <button
@@ -207,7 +207,7 @@ function GroupPage() {
               <p className="font-ledger mt-3 text-[64px] leading-none font-semibold">
                 {formatSignedMoney(myNet, currency)}
               </p>
-              <p className="text-muted mt-3 text-sm">
+              <p className="text-muted-foreground mt-3 text-sm">
                 {settledUp
                   ? "All settled up. Nobody owes anybody."
                   : myNet < 0
@@ -228,14 +228,14 @@ function GroupPage() {
                     <button
                       type="button"
                       onClick={() => setView("simplified")}
-                      className={`rounded-md px-3 py-1.5 ${view === "simplified" ? "bg-ink text-paper" : "text-muted"}`}
+                      className={`rounded-md px-3 py-1.5 ${view === "simplified" ? "bg-ink text-paper" : "text-muted-foreground"}`}
                     >
                       Simplified
                     </button>
                     <button
                       type="button"
                       onClick={() => setView("raw")}
-                      className={`rounded-md px-3 py-1.5 ${view === "raw" ? "bg-ink text-paper" : "text-muted"}`}
+                      className={`rounded-md px-3 py-1.5 ${view === "raw" ? "bg-ink text-paper" : "text-muted-foreground"}`}
                     >
                       Raw
                     </button>
@@ -244,7 +244,7 @@ function GroupPage() {
 
                 <div className="mt-4 space-y-3">
                   {transfers.length === 0 ? (
-                    <p className="text-muted rounded-lg bg-paper px-4 py-3 text-sm">
+                    <p className="text-muted-foreground rounded-lg bg-paper px-4 py-3 text-sm">
                       {settledUp ? "All settled up." : "Nothing to pay yet."}
                     </p>
                   ) : null}
@@ -257,7 +257,7 @@ function GroupPage() {
                         <p className="truncate text-sm font-medium">
                           {label(transfer.from_member_id)} → {label(transfer.to_member_id)}
                         </p>
-                        <p className="text-muted text-xs">
+                        <p className="text-muted-foreground text-xs">
                           {view === "simplified" ? "Combined payment" : "Directly between them"}
                         </p>
                       </div>
@@ -287,7 +287,7 @@ function GroupPage() {
                     </p>
                   </div>
                 ) : (
-                  <p className="text-muted mt-4 text-xs leading-relaxed">
+                  <p className="text-muted-foreground mt-4 text-xs leading-relaxed">
                     Straight from the expenses, with nothing combined. Use this to check the
                     simplified list.
                   </p>
@@ -300,7 +300,7 @@ function GroupPage() {
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <h2 className="font-ledger text-lg font-semibold">Expenses</h2>
-                    <p className="text-muted mt-0.5 text-xs">
+                    <p className="text-muted-foreground mt-0.5 text-xs">
                       {snapshot.expenses.length}{" "}
                       {snapshot.expenses.length === 1 ? "entry" : "entries"} ·{" "}
                       {formatMoney(total, currency)} total
@@ -316,7 +316,7 @@ function GroupPage() {
                 </div>
 
                 {snapshot.expenses.length === 0 ? (
-                  <p className="text-muted mt-5 text-sm">
+                  <p className="text-muted-foreground mt-5 text-sm">
                     No expenses yet. Add the first thing somebody paid for.
                   </p>
                 ) : (
@@ -337,7 +337,7 @@ function GroupPage() {
                           />
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-sm font-medium">{expense.description}</p>
-                            <p className="text-muted text-xs">
+                            <p className="text-muted-foreground text-xs">
                               {label(expense.payer_member_id)} paid ·{" "}
                               {expense.split_type === "equal"
                                 ? `split ${expense.shares.length} ways`
@@ -350,11 +350,11 @@ function GroupPage() {
                               {formatMoney(expense.amount_cents, currency)}
                             </span>
                             {myShare ? (
-                              <span className="text-muted text-xs">
+                              <span className="text-muted-foreground text-xs">
                                 your share {formatMoney(myShare.amount_cents, currency)}
                               </span>
                             ) : (
-                              <span className="text-muted text-xs">not your share</span>
+                              <span className="text-muted-foreground text-xs">not your share</span>
                             )}
                           </div>
                         </button>
@@ -403,7 +403,7 @@ function GroupPage() {
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <h2 className="font-ledger text-lg font-semibold">Payments recorded</h2>
-                    <p className="text-muted mt-0.5 text-xs">
+                    <p className="text-muted-foreground mt-0.5 text-xs">
                       Money already handed over between people.
                     </p>
                   </div>
@@ -418,7 +418,7 @@ function GroupPage() {
                 </div>
 
                 {snapshot.settlements.length === 0 ? (
-                  <p className="text-muted mt-5 text-sm">Nothing recorded yet.</p>
+                  <p className="text-muted-foreground mt-5 text-sm">Nothing recorded yet.</p>
                 ) : (
                   <div className="mt-5 divide-y divide-line">
                     {snapshot.settlements.map((settlement) => (
@@ -428,7 +428,7 @@ function GroupPage() {
                             {label(settlement.from_member_id)} paid{" "}
                             {label(settlement.to_member_id)}
                           </p>
-                          <p className="text-muted text-xs">{settlement.date}</p>
+                          <p className="text-muted-foreground text-xs">{settlement.date}</p>
                         </div>
                         <span className="font-ledger text-base font-semibold">
                           {formatMoney(settlement.amount_cents, currency)}
@@ -436,7 +436,7 @@ function GroupPage() {
                         <button
                           type="button"
                           onClick={() => setDialog({ kind: "settlement", settlement })}
-                          className="text-muted rounded-md px-2 py-1.5 text-xs font-semibold hover:bg-paper"
+                          className="text-muted-foreground rounded-md px-2 py-1.5 text-xs font-semibold hover:bg-paper"
                         >
                           Edit
                         </button>
@@ -456,7 +456,7 @@ function GroupPage() {
           </section>
         )}
 
-        <footer className="text-muted mt-8 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-4 text-xs">
+        <footer className="text-muted-foreground mt-8 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-4 text-xs">
           <p>Integer minor units only · no floats, ever.</p>
           <p>Updates from other people appear within 5 seconds.</p>
         </footer>

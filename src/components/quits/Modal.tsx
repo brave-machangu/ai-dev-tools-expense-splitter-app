@@ -25,13 +25,13 @@ export function Modal({
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2 className="font-ledger text-lg font-semibold">{title}</h2>
-            {subtitle ? <p className="text-muted mt-0.5 text-xs">{subtitle}</p> : null}
+            {subtitle ? <p className="text-muted-foreground mt-0.5 text-xs">{subtitle}</p> : null}
           </div>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="text-muted rounded-md px-2 py-1 text-sm hover:bg-paper"
+            className="text-muted-foreground rounded-md px-2 py-1 text-sm hover:bg-paper"
           >
             ✕
           </button>
@@ -57,7 +57,7 @@ export function LabelledField({
 }) {
   return (
     <label className={`block ${className}`}>
-      <span className="text-muted text-xs font-medium">{label}</span>
+      <span className="text-muted-foreground text-xs font-medium">{label}</span>
       <div className="mt-1.5">{children}</div>
     </label>
   );

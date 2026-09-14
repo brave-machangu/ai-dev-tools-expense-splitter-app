@@ -175,14 +175,14 @@ export function ExpenseDialog({
               <button
                 type="button"
                 onClick={() => setSplitType("equal")}
-                className={`flex-1 rounded-md px-3 py-2 ${splitType === "equal" ? "bg-ink text-paper" : "text-muted"}`}
+                className={`flex-1 rounded-md px-3 py-2 ${splitType === "equal" ? "bg-ink text-paper" : "text-muted-foreground"}`}
               >
                 Equally
               </button>
               <button
                 type="button"
                 onClick={() => setSplitType("exact")}
-                className={`flex-1 rounded-md px-3 py-2 ${splitType === "exact" ? "bg-ink text-paper" : "text-muted"}`}
+                className={`flex-1 rounded-md px-3 py-2 ${splitType === "exact" ? "bg-ink text-paper" : "text-muted-foreground"}`}
               >
                 Exact amounts
               </button>
@@ -190,7 +190,7 @@ export function ExpenseDialog({
           </LabelledField>
         </div>
 
-        <p className="text-muted mt-5 text-xs font-medium">Split between</p>
+        <p className="text-muted-foreground mt-5 text-xs font-medium">Split between</p>
         <div className="mt-2 divide-y divide-line rounded-lg border border-line bg-paper px-3">
           {members.map((member) => {
             const checked = participantIds.includes(member.id);
@@ -252,7 +252,7 @@ export function ExpenseDialog({
           <button
             type="button"
             onClick={onClose}
-            className="text-muted flex-1 rounded-lg border border-line px-4 py-3 text-sm font-semibold"
+            className="text-muted-foreground flex-1 rounded-lg border border-line px-4 py-3 text-sm font-semibold"
           >
             Cancel
           </button>
@@ -265,7 +265,7 @@ export function ExpenseDialog({
           </button>
         </div>
         {splitType === "exact" && remainder !== 0 ? (
-          <p className="text-muted mt-2 text-center text-xs">
+          <p className="text-muted-foreground mt-2 text-center text-xs">
             Allocate the full total to enable saving.
           </p>
         ) : null}

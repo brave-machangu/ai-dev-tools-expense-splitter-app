@@ -68,7 +68,7 @@ function Landing() {
             <QuitsMark />
             <div>
               <p className="font-ledger text-xl leading-none font-semibold">Quits</p>
-              <p className="text-muted mt-1 text-xs">Split it, settle it.</p>
+              <p className="text-muted-foreground mt-1 text-xs">Split it, settle it.</p>
             </div>
           </div>
         </header>
@@ -81,12 +81,12 @@ function Landing() {
             <h1 className="font-ledger mt-4 text-5xl leading-[1.05] font-semibold sm:text-6xl">
               Work out who owes whom, then stop talking about it.
             </h1>
-            <p className="text-muted mt-5 max-w-lg text-sm leading-relaxed">
+            <p className="text-muted-foreground mt-5 max-w-lg text-sm leading-relaxed">
               Start a group for the trip, the villa, the dinner series. Share one link. Everyone
               adds what they paid, and Quits works out the shortest set of payments that clears
               the whole group out.
             </p>
-            <p className="text-muted mt-6 border-t border-line pt-5 text-xs">
+            <p className="text-muted-foreground mt-6 border-t border-line pt-5 text-xs">
               Quits records that a payment happened. It never moves money.
             </p>
           </div>
@@ -99,7 +99,7 @@ function Landing() {
               <h2 className="font-ledger text-lg font-semibold">Start a group</h2>
 
               <label className="mt-5 block">
-                <span className="text-muted text-xs font-medium">Group name</span>
+                <span className="text-muted-foreground text-xs font-medium">Group name</span>
                 <input
                   value={name}
                   onChange={(event) => setName(event.target.value)}
@@ -110,7 +110,7 @@ function Landing() {
               </label>
 
               <label className="mt-4 block">
-                <span className="text-muted text-xs font-medium">Currency</span>
+                <span className="text-muted-foreground text-xs font-medium">Currency</span>
                 <select
                   value={currency}
                   onChange={(event) => setCurrency(event.target.value)}
@@ -124,7 +124,7 @@ function Landing() {
                 </select>
               </label>
 
-              <p className="text-muted mt-2 text-xs leading-relaxed">
+              <p className="text-muted-foreground mt-2 text-xs leading-relaxed">
                 One currency per group, chosen now and fixed afterwards. Only currencies with two
                 decimal places are supported, so JPY, KRW and KWD aren&apos;t in the list.
               </p>
@@ -140,7 +140,7 @@ function Landing() {
 
             <form onSubmit={join} className="mt-4 flex items-end gap-2">
               <label className="flex-1">
-                <span className="text-muted text-xs font-medium">Already have a code?</span>
+                <span className="text-muted-foreground text-xs font-medium">Already have a code?</span>
                 <input
                   value={joinCode}
                   onChange={(event) => setJoinCode(event.target.value.toUpperCase())}
@@ -159,7 +159,7 @@ function Landing() {
           </div>
         </section>
 
-        <footer className="text-muted mt-16 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-4 text-xs">
+        <footer className="text-muted-foreground mt-16 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-4 text-xs">
           <p>Integer minor units only · no floats, ever.</p>
           <p>Anyone with the link can see and edit the group.</p>
         </footer>

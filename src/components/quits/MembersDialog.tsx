@@ -45,7 +45,7 @@ export function MembersDialog({
     <Modal title="People" subtitle="Up to 8 people per group" onClose={onClose}>
       <div className="divide-y divide-line rounded-lg border border-line bg-paper px-3">
         {members.length === 0 ? (
-          <p className="text-muted py-4 text-sm">Nobody yet — add the first name below.</p>
+          <p className="text-muted-foreground py-4 text-sm">Nobody yet — add the first name below.</p>
         ) : null}
         {members.map((member) => (
           <div key={member.id} className="flex items-center gap-3 py-2.5">
@@ -79,7 +79,7 @@ export function MembersDialog({
                     setEditingId(member.id);
                     setEditName(member.name);
                   }}
-                  className="text-muted rounded-md px-2 py-1.5 text-xs font-semibold hover:bg-card"
+                  className="text-muted-foreground rounded-md px-2 py-1.5 text-xs font-semibold hover:bg-card"
                 >
                   Rename
                 </button>
@@ -113,7 +113,7 @@ export function MembersDialog({
           Add
         </button>
       </form>
-      <p className="text-muted mt-2 text-xs leading-relaxed">
+      <p className="text-muted-foreground mt-2 text-xs leading-relaxed">
         Someone added now isn&apos;t added to expenses that already exist. People who appear in an
         expense or payment can be renamed but not removed.
       </p>

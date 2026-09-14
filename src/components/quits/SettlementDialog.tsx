@@ -125,7 +125,7 @@ export function SettlementDialog({
         {fromId === toId ? (
           <p className="mt-3 text-xs text-debt">A payment needs two different people.</p>
         ) : null}
-        <p className="text-muted mt-3 text-xs leading-relaxed">
+        <p className="text-muted-foreground mt-3 text-xs leading-relaxed">
           Paying more than suggested is fine — the extra simply flips the balance the other way.
         </p>
 
@@ -133,7 +133,7 @@ export function SettlementDialog({
           <button
             type="button"
             onClick={onClose}
-            className="text-muted flex-1 rounded-lg border border-line px-4 py-3 text-sm font-semibold"
+            className="text-muted-foreground flex-1 rounded-lg border border-line px-4 py-3 text-sm font-semibold"
           >
             Cancel
           </button>
