@@ -67,8 +67,9 @@ export function simplifyTransfers(balances: Balance[], members: Member[]): Trans
   let d = 0;
   let c = 0;
   while (d < debtors.length && c < creditors.length) {
-    const debtor = debtors[d];
-    const creditor = creditors[c];
+    const debtor = debtors[d]!;
+    const creditor = creditors[c]!;
+
     const amount = Math.min(debtor.amount, creditor.amount);
     if (amount > 0) {
       transfers.push({
@@ -112,8 +113,9 @@ export function computePairwise(
   const result: Transfer[] = [];
   for (let i = 0; i < ordered.length; i += 1) {
     for (let j = i + 1; j < ordered.length; j += 1) {
-      const a = ordered[i].id;
-      const b = ordered[j].id;
+      const a = ordered[i]!.id;
+      const b = ordered[j]!.id;
+
       const netted = (owes.get(key(a, b)) ?? 0) - (owes.get(key(b, a)) ?? 0);
       if (netted > 0) {
         result.push({ from_member_id: a, to_member_id: b, amount_cents: netted });

@@ -75,7 +75,7 @@ export interface ExpenseInput {
   date: string;
   split_type: SplitType;
   participant_ids: string[];
-  exact_shares?: { member_id: string; amount_cents: number }[];
+  exact_shares?: { member_id: string; amount_cents: number }[] | undefined;
 }
 
 export interface SettlementInput {

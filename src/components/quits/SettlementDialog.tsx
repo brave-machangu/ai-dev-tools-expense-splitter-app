@@ -23,8 +23,8 @@ export function SettlementDialog({
   code: string;
   members: Member[];
   currency: string;
-  settlement?: Settlement;
-  prefill?: { from_member_id: string; to_member_id: string; amount_cents: number };
+  settlement?: Settlement | undefined;
+  prefill?: { from_member_id: string; to_member_id: string; amount_cents: number } | undefined;
   onClose: () => void;
   onSaved: (snapshot: GroupSnapshot) => void;
 }) {

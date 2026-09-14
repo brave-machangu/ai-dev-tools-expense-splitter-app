@@ -32,8 +32,8 @@ export function ExpenseDialog({
   code: string;
   members: Member[];
   currency: string;
-  expense?: Expense;
-  defaultPayerId?: string | null;
+  expense?: Expense | undefined;
+  defaultPayerId?: string | null | undefined;
   onClose: () => void;
   onSaved: (snapshot: GroupSnapshot) => void;
 }) {
