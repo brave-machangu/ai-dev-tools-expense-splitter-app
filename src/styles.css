@@ -103,10 +103,6 @@
   letter-spacing: -0.01em;
 }
 
-@utility text-muted-foreground {
-  color: var(--color-muted-foreground);
-}
-
 @utility tnum {
   font-variant-numeric: tabular-nums;
 }
