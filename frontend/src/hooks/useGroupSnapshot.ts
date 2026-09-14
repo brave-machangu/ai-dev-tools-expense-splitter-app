@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { api } from "../api/client";
+import { api, errorMessage } from "../api/client";
 import { ApiError, type GroupSnapshot } from "../types";
 
 export type SnapshotStatus = "loading" | "ready" | "not_found" | "error";
@@ -21,6 +21,8 @@ export function useGroupSnapshot(code: string, holdUpdates: boolean) {
   const [snapshot, setSnapshot] = useState<GroupSnapshot | null>(null);
   const [status, setStatus] = useState<SnapshotStatus>("loading");
   const [lastSyncFailed, setLastSyncFailed] = useState(false);
+  /** Why the most recent fetch failed; null after a success. */
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const holdRef = useRef(holdUpdates);
   const pendingRef = useRef<GroupSnapshot | null>(null);
@@ -43,11 +45,13 @@ export function useGroupSnapshot(code: string, holdUpdates: boolean) {
       else setSnapshot(next);
       setStatus("ready");
       setLastSyncFailed(false);
+      setLoadError(null);
     } catch (error) {
       if (seq !== requestSeq.current) return;
       if (error instanceof ApiError && error.status === 404) {
         setStatus("not_found");
       } else {
+        setLoadError(errorMessage(error));
         setLastSyncFailed(true);
         setStatus((current) => (current === "ready" ? current : "error"));
       }
@@ -75,7 +79,8 @@ export function useGroupSnapshot(code: string, holdUpdates: boolean) {
     setSnapshot(next);
     setStatus("ready");
     setLastSyncFailed(false);
+    setLoadError(null);
   }, []);
 
-  return { snapshot, status, lastSyncFailed, refresh, commit };
+  return { snapshot, status, lastSyncFailed, loadError, refresh, commit };
 }

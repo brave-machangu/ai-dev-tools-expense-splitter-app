@@ -31,7 +31,10 @@ export function GroupPage({ code }: { code: string }) {
   const [modal, setModal] = useState<ModalState | null>(null);
   // F9: hold incoming snapshots while a form is open (viewing isn't editing).
   const formOpen = modal !== null && modal.kind !== "view-expense";
-  const { snapshot, status, lastSyncFailed, refresh, commit } = useGroupSnapshot(code, formOpen);
+  const { snapshot, status, lastSyncFailed, loadError, refresh, commit } = useGroupSnapshot(
+    code,
+    formOpen,
+  );
 
   const [meId, setMeId] = useState<string | null>(() => readIdentity(code));
   const [identityNotice, setIdentityNotice] = useState<string | null>(null);
@@ -54,7 +57,7 @@ export function GroupPage({ code }: { code: string }) {
   }, [modal, snapshot]);
 
   useEffect(() => {
-    document.title = snapshot ? `${snapshot.group.name} · Quits` : "Quits";
+    document.title = snapshot ? `${snapshot.group.name} · ProRata` : "ProRata";
   }, [snapshot]);
 
   if (status === "loading") {
@@ -85,7 +88,9 @@ export function GroupPage({ code }: { code: string }) {
     return (
       <section className="card empty-state">
         <h1 className="section-title">Couldn't load this group</h1>
-        <p className="muted">Something went wrong reaching the server.</p>
+        <p className="muted" role="alert">
+          {loadError ?? "Something went wrong reaching the server."}
+        </p>
         <button type="button" className="btn btn-primary" onClick={() => void refresh()}>
           Try again
         </button>

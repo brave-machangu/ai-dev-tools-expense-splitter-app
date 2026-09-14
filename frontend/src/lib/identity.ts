@@ -3,7 +3,7 @@
  * Every access is guarded — private browsing or blocked site data can make
  * localStorage throw, and the app must still work (it just asks every time).
  */
-const keyFor = (code: string) => `quits.identity.${code.toUpperCase()}`;
+const keyFor = (code: string) => `prorata.identity.${code.toUpperCase()}`;
 
 export function readIdentity(code: string): string | null {
   try {

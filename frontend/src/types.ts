@@ -125,8 +125,11 @@ export interface SettlementInput {
 // Errors
 // ---------------------------------------------------------------------------
 
-/** HTTP status codes the API uses (spec §9). */
-export type ApiErrorStatus = 404 | 409 | 422 | 500;
+/**
+ * HTTP status of a failed call — the API uses 404, 409 and 422 (spec §9) — or
+ * 0 when no response arrived (server unreachable or timed out).
+ */
+export type ApiErrorStatus = number;
 
 export class ApiError extends Error {
   readonly status: ApiErrorStatus;

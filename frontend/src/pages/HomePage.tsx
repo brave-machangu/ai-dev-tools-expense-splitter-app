@@ -1,7 +1,6 @@
 import { useState, type FormEvent } from "react";
 
-import { api, errorMessage, mockTools } from "../api/client";
-import { Link } from "../components/Link";
+import { api, errorMessage } from "../api/client";
 import { SUPPORTED_CURRENCIES } from "../domain/money";
 import { groupPath, navigate } from "../lib/router";
 
@@ -15,8 +14,6 @@ export function HomePage() {
 
   const [code, setCode] = useState("");
   const [codeError, setCodeError] = useState<string | null>(null);
-
-  const [resetState, setResetState] = useState<"idle" | "working" | "done">("idle");
 
   const createGroup = async (event: FormEvent) => {
     event.preventDefault();
@@ -44,18 +41,12 @@ export function HomePage() {
     navigate(groupPath(cleaned));
   };
 
-  const resetSample = async () => {
-    setResetState("working");
-    await mockTools.resetData();
-    setResetState("done");
-  };
-
   return (
     <div className="home">
       <section className="hero">
         <h1 className="hero-title">Split the trip, not the friendship.</h1>
         <p className="hero-lede">
-          Make a group, share the link, and everyone adds what they paid. Quits works out who owes
+          Make a group, share the link, and everyone adds what they paid. ProRata works out who owes
           whom — and the fewest payments to settle up.
         </p>
       </section>
@@ -93,7 +84,11 @@ export function HomePage() {
                 supported, so JPY, KRW, KWD and similar aren't available.
               </span>
             </label>
-            {createError && <p className="form-error">{createError}</p>}
+            {createError && (
+              <p className="form-error" role="alert">
+                {createError}
+              </p>
+            )}
             <button className="btn btn-primary" type="submit" disabled={creating || !name.trim()}>
               {creating ? "Creating…" : "Create group"}
             </button>
@@ -101,31 +96,6 @@ export function HomePage() {
         </section>
 
         <div className="stack">
-          <section className="card card-accent">
-            <h2 className="section-title">Try the sample group</h2>
-            <p className="muted">
-              “Lisbon weekend” — four friends, five expenses and one payment already recorded.
-            </p>
-            <div className="row">
-              <Link to={groupPath(mockTools.sampleGroupCode)} className="btn btn-primary">
-                Open sample group
-              </Link>
-              <button
-                type="button"
-                className="btn btn-ghost"
-                onClick={resetSample}
-                disabled={resetState === "working"}
-              >
-                {resetState === "working" ? "Resetting…" : "Reset sample data"}
-              </button>
-            </div>
-            {resetState === "done" && (
-              <p className="small muted" role="status">
-                Mock data restored to the original sample.
-              </p>
-            )}
-          </section>
-
           <section className="card">
             <h2 className="section-title">Got a link or code?</h2>
             <form className="row row-nowrap" onSubmit={openByCode}>

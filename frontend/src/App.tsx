@@ -10,13 +10,15 @@ export function App() {
     <div className="app">
       <header className="site-header">
         <div className="container site-header-inner">
-          <Link to="/" className="brand" aria-label="Quits home">
+          <Link to="/" className="brand" aria-label="ProRata home">
             <span className="brand-mark" aria-hidden="true">
-              Q
+              P
             </span>
-            <span className="brand-name">Quits</span>
+            <span className="brand-name">ProRata</span>
           </Link>
-          <span className="brand-tagline">Split costs with a link. No accounts.</span>
+          <span className="brand-tagline">
+            Split expenses pro rata. Settle up in the fewest payments.
+          </span>
         </div>
       </header>
 
@@ -36,7 +38,7 @@ export function App() {
 
       <footer className="site-footer container">
         <p className="small muted">
-          Quits records payments — it never moves money. Anyone with a group link can edit it.
+          ProRata records payments — it never moves money. Anyone with a group link can edit it.
         </p>
       </footer>
     </div>

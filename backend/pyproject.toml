@@ -1,0 +1,28 @@
+[project]
+name = "prorata"
+version = "0.1.0"
+requires-python = ">=3.14"
+dependencies = [
+    "fastapi[standard]>=0.141.1",
+    "sqlalchemy>=2.0",
+]
+
+[dependency-groups]
+dev = [
+    "jsonschema>=4.26.0",
+    "pytest>=9.1.1",
+    "pyyaml>=6.0.3",
+    "ruff>=0.16.7",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-ra"
+
+[tool.ruff]
+line-length = 100
+target-version = "py314"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "N", "SIM"]
