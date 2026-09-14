@@ -1,8 +1,22 @@
 # AGENTS.md
 
+**This repository is ProRata, an expense splitter.** Groups share a link, members add
+expenses, and ProRata shows who owes whom and the payments that settle everyone up.
+The git repository is still named `ai-dev-expense-splitter-app`; that is expected.
+
 Instructions for coding agents working in this repository. Read
 [`_docs/specs.md`](_docs/specs.md) before making product or data-model decisions —
 it is the source of truth.
+
+## Naming
+
+- Display name: **ProRata** (one word, capital P, capital R). Never "Pro Rata",
+  "Prorata" or "PRORATA" in user-facing text.
+- Identifier form: `prorata` — package names, folders, the `prorata.` localStorage key
+  prefix. Environment variables use the `PRORATA_` prefix.
+- Tagline: *Split expenses pro rata. Settle up in the fewest payments.*
+- Database: the default SQLite file is `backend/prorata.db`, anchored to the `backend/`
+  directory rather than the working directory. Override it with `DATABASE_URL`.
 
 ## Folder layout
 
@@ -18,7 +32,15 @@ frontend/                   React + TypeScript + Vite, plain CSS
   src/components/           Reusable UI and group-screen components
   src/pages/                Top-level screens (home, group)
   src/styles/global.css     Design tokens and all styles
-backend/                    FastAPI service, managed with uv (not started yet)
+backend/                    FastAPI service, managed with uv
+  app/main.py               create_app(repository): wiring, CORS, error handlers
+  app/routes.py             One thin handler per operation in _docs/openapi.yaml
+  app/schemas.py            Pydantic request/response models (mirror openapi.yaml)
+  app/service.py            Business rules; talks to storage only via Repository
+  app/repository.py         Repository protocol + InMemoryRepository (mock database)
+  app/calc.py               Pure split/balance maths (must match frontend results)
+  app/models.py             Storage records (dataclasses)
+  tests/                    Endpoint tests via TestClient, checked against openapi.yaml
 ```
 
 Run frontend commands from `frontend/` and backend commands from `backend/`.

@@ -1,0 +1,850 @@
+openapi: 3.1.0
+
+info:
+  title: ProRata API
+  version: 1.0.0
+  summary: Backend contract for ProRata, the no-account expense splitter.
+  description: |
+    Derived from the frontend's single API client module
+    (`frontend/src/api/client.ts`) and its types (`frontend/src/types.ts`), as
+    required by assignment Q5. Behaviour is defined by `_docs/specs.md`; section
+    references (§) below point there.
+
+    **Conventions**
+
+    - Money is always integer minor units (`*_cents`). No floats anywhere.
+    - Ids are UUID strings. Group codes are 8-character Crockford base32.
+    - `*_at` fields are RFC 3339 date-times in UTC. `date` fields are calendar
+      dates (`YYYY-MM-DD`), user-supplied display metadata only.
+    - No authentication. Possession of the group code is the only access
+      control (§11).
+    - Every call that changes a group returns the full, recomputed
+      `GroupSnapshot` — the same shape the client polls every 5 seconds — so the
+      client replaces its state in one step.
+    - Text inputs are trimmed before length validation; whitespace-only values
+      are rejected with `422`.
+
+servers:
+  - url: http://localhost:8000
+    description: Local FastAPI development server (assumed port)
+
+# No authentication by design (§11): the group code is the only access control.
+security: []
+
+tags:
+  - name: Groups
+    description: Create a group and read its full snapshot.
+  - name: Members
+    description: The typed-in people in a group (up to 8).
+  - name: Expenses
+    description: Costs paid by one member and shared by others.
+  - name: Settlements
+    description: Recorded payments between two members.
+
+paths:
+  /api/groups:
+    post:
+      tags: [Groups]
+      operationId: createGroup
+      summary: Create a group
+      description: |
+        Creates a group and generates a unique 8-character code (§F1). Name and
+        currency cannot be changed afterwards. The client navigates to
+        `/g/{code}` and then calls `getGroup`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateGroupInput"
+            example:
+              name: Lisbon weekend
+              currency: EUR
+      responses:
+        "201":
+          description: Group created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateGroupResult"
+              example:
+                code: TR1P2026
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/groups/{code}:
+    parameters:
+      - $ref: "#/components/parameters/GroupCode"
+    get:
+      tags: [Groups]
+      operationId: getGroup
+      summary: Get the full group snapshot
+      description: |
+        The one "fat" read endpoint (§9). Returns the group, its members,
+        expenses with stored shares, settlements, and the computed balances,
+        suggested transfers and raw pairwise debts. The client polls this every
+        5 seconds while the tab is visible (§F9).
+      responses:
+        "200":
+          description: Current state of the group.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GroupSnapshot"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/groups/{code}/members:
+    parameters:
+      - $ref: "#/components/parameters/GroupCode"
+    post:
+      tags: [Members]
+      operationId: addMember
+      summary: Add a member
+      description: |
+        Adds a typed-in name (§F2). The server assigns the next `position`,
+        which is monotonic and never reused within the group, even after a
+        member is deleted. A new member is not added to existing expenses.
+
+        Fails with `422` when the group already has 8 members.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MemberNameInput"
+            example:
+              name: Priya
+      responses:
+        "201":
+          $ref: "#/components/responses/Snapshot"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/groups/{code}/members/{memberId}:
+    parameters:
+      - $ref: "#/components/parameters/GroupCode"
+      - $ref: "#/components/parameters/MemberId"
+    patch:
+      tags: [Members]
+      operationId: renameMember
+      summary: Rename a member
+      description: Changes only the name. Id and position are unchanged.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MemberNameInput"
+            example:
+              name: Sam
+      responses:
+        "200":
+          $ref: "#/components/responses/Snapshot"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    delete:
+      tags: [Members]
+      operationId: deleteMember
+      summary: Delete a member
+      description: |
+        Only allowed when nothing references the member: they are not the payer
+        of any expense, have no share row (including a zero-amount exact share),
+        and are not the payer or recipient of any settlement. Otherwise `409`.
+      responses:
+        "200":
+          $ref: "#/components/responses/Snapshot"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/groups/{code}/expenses:
+    parameters:
+      - $ref: "#/components/parameters/GroupCode"
+    post:
+      tags: [Expenses]
+      operationId: createExpense
+      summary: Create an expense
+      description: |
+        The server computes and stores one share row per participant (§5):
+
+        - `equal`: floor division, then the remainder goes one minor unit at a
+          time to participants in ascending `position` (§7.1). `exact_shares` is
+          ignored.
+        - `exact`: `exact_shares` is stored verbatim.
+
+        Rules checked on the server, all returning `422` on failure:
+
+        - The payer and every participant are current members of this group.
+        - For `exact`: there is exactly one entry per participant, with the
+          same member set as `participant_ids`.
+        - For `exact`: the entries add up exactly to `amount_cents`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExpenseInput"
+            examples:
+              equal:
+                summary: Equal split among a subset
+                value:
+                  payer_member_id: 2f1c9d4e-8a51-4c1e-9b7a-3d2f0e6a1b11
+                  amount_cents: 3650
+                  description: Taxis from the airport
+                  date: "2026-09-10"
+                  split_type: equal
+                  participant_ids:
+                    - 6d0b2c7a-1e34-4f8b-a5c9-0f1e2d3c4b55
+                    - 2f1c9d4e-8a51-4c1e-9b7a-3d2f0e6a1b11
+                    - 9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c66
+              exact:
+                summary: Exact amounts
+                value:
+                  payer_member_id: 9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c66
+                  amount_cents: 9400
+                  description: Tuesday dinner
+                  date: "2026-09-12"
+                  split_type: exact
+                  participant_ids:
+                    - 6d0b2c7a-1e34-4f8b-a5c9-0f1e2d3c4b55
+                    - 2f1c9d4e-8a51-4c1e-9b7a-3d2f0e6a1b11
+                    - 9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c66
+                  exact_shares:
+                    - member_id: 6d0b2c7a-1e34-4f8b-a5c9-0f1e2d3c4b55
+                      amount_cents: 3000
+                    - member_id: 2f1c9d4e-8a51-4c1e-9b7a-3d2f0e6a1b11
+                      amount_cents: 3400
+                    - member_id: 9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c66
+                      amount_cents: 3000
+      responses:
+        "201":
+          $ref: "#/components/responses/Snapshot"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/groups/{code}/expenses/{expenseId}:
+    parameters:
+      - $ref: "#/components/parameters/GroupCode"
+      - $ref: "#/components/parameters/ExpenseId"
+    put:
+      tags: [Expenses]
+      operationId: updateExpense
+      summary: Replace an expense
+      description: |
+        Full replacement: every field is sent again, with the same validation as
+        `createExpense`. Shares are recomputed and rewritten, and `updated_at` is
+        bumped. `created_at` is unchanged, so the expense keeps its place in the
+        list. Last write wins; there is no optimistic locking (§11).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExpenseInput"
+      responses:
+        "200":
+          $ref: "#/components/responses/Snapshot"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    delete:
+      tags: [Expenses]
+      operationId: deleteExpense
+      summary: Delete an expense
+      description: Hard delete. Its share rows are deleted too (§F8).
+      responses:
+        "200":
+          $ref: "#/components/responses/Snapshot"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/groups/{code}/settlements:
+    parameters:
+      - $ref: "#/components/parameters/GroupCode"
+    post:
+      tags: [Settlements]
+      operationId: createSettlement
+      summary: Record a payment
+      description: |
+        Records that `from_member_id` paid `to_member_id` (§F7). Paying more than
+        is owed is allowed and produces a balance the other way.
+
+        Returns `422` if the two members are the same or either one isn't in
+        this group.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SettlementInput"
+            example:
+              from_member_id: 2f1c9d4e-8a51-4c1e-9b7a-3d2f0e6a1b11
+              to_member_id: 6d0b2c7a-1e34-4f8b-a5c9-0f1e2d3c4b55
+              amount_cents: 5000
+              date: "2026-09-13"
+      responses:
+        "201":
+          $ref: "#/components/responses/Snapshot"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/groups/{code}/settlements/{settlementId}:
+    parameters:
+      - $ref: "#/components/parameters/GroupCode"
+      - $ref: "#/components/parameters/SettlementId"
+    put:
+      tags: [Settlements]
+      operationId: updateSettlement
+      summary: Replace a payment
+      description: Full replacement with the same validation as `createSettlement`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SettlementInput"
+      responses:
+        "200":
+          $ref: "#/components/responses/Snapshot"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    delete:
+      tags: [Settlements]
+      operationId: deleteSettlement
+      summary: Delete a payment
+      description: Hard delete.
+      responses:
+        "200":
+          $ref: "#/components/responses/Snapshot"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+components:
+  parameters:
+    GroupCode:
+      name: code
+      in: path
+      required: true
+      description: The group's 8-character code, as it appears in `/g/{code}`.
+      schema:
+        $ref: "#/components/schemas/GroupCode"
+    MemberId:
+      name: memberId
+      in: path
+      required: true
+      schema:
+        $ref: "#/components/schemas/Id"
+    ExpenseId:
+      name: expenseId
+      in: path
+      required: true
+      schema:
+        $ref: "#/components/schemas/Id"
+    SettlementId:
+      name: settlementId
+      in: path
+      required: true
+      schema:
+        $ref: "#/components/schemas/Id"
+
+  responses:
+    Snapshot:
+      description: The change was applied. Body is the full recomputed snapshot.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/GroupSnapshot"
+    NotFound:
+      description: Unknown group code, or no such member/expense/settlement in this group.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            detail: Group not found
+    Conflict:
+      description: The member is referenced by an expense, share or settlement.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            detail: This person is part of an expense or payment, so they can't be removed.
+    ValidationFailed:
+      description: |
+        The request broke a validation rule: a schema constraint, or one of the
+        cross-field rules described on each operation.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ValidationError"
+          examples:
+            businessRule:
+              summary: Rule checked in application code
+              value:
+                detail: Exact amounts must add up to the total
+            schema:
+              summary: FastAPI request-validation format
+              value:
+                detail:
+                  - loc: [body, amount_cents]
+                    msg: Input should be greater than or equal to 1
+                    type: greater_than_equal
+    InternalError:
+      description: Unexpected server error.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            detail: Internal server error
+
+  schemas:
+    # ------------------------------------------------------------ primitives
+    Id:
+      type: string
+      format: uuid
+      examples:
+        - 2f1c9d4e-8a51-4c1e-9b7a-3d2f0e6a1b11
+
+    GroupCode:
+      type: string
+      description: Crockford base32 (digits and uppercase letters, excluding I, L, O and U).
+      pattern: "^[0-9A-HJKMNP-TV-Z]{8}$"
+      examples:
+        - TR1P2026
+
+    Currency:
+      type: string
+      description: |
+        ISO 4217 code. Only currencies with exactly 2 decimal places are
+        supported (§6).
+      enum:
+        [
+          USD,
+          EUR,
+          GBP,
+          CHF,
+          CAD,
+          AUD,
+          NZD,
+          ZAR,
+          SEK,
+          NOK,
+          DKK,
+          PLN,
+          CZK,
+          MXN,
+          BRL,
+          INR,
+          SGD,
+          HKD,
+          THB,
+          TRY,
+          ILS,
+        ]
+
+    AmountCents:
+      type: integer
+      description: A positive amount in minor units. Maximum 1,000,000.00.
+      minimum: 1
+      maximum: 100000000
+      examples:
+        - 3650
+
+    CalendarDate:
+      type: string
+      format: date
+      examples:
+        - "2026-09-12"
+
+    Timestamp:
+      type: string
+      format: date-time
+      examples:
+        - "2026-09-12T18:30:00Z"
+
+    SplitType:
+      type: string
+      enum: [equal, exact]
+
+    # ---------------------------------------------------------- domain model
+    Group:
+      type: object
+      required: [id, code, name, currency, created_at]
+      properties:
+        id:
+          $ref: "#/components/schemas/Id"
+        code:
+          $ref: "#/components/schemas/GroupCode"
+        name:
+          type: string
+          minLength: 1
+          maxLength: 60
+        currency:
+          $ref: "#/components/schemas/Currency"
+        created_at:
+          $ref: "#/components/schemas/Timestamp"
+
+    Member:
+      type: object
+      required: [id, group_id, name, position, created_at]
+      properties:
+        id:
+          $ref: "#/components/schemas/Id"
+        group_id:
+          $ref: "#/components/schemas/Id"
+        name:
+          type: string
+          minLength: 1
+          maxLength: 40
+        position:
+          type: integer
+          minimum: 0
+          description: |
+            Monotonic within the group and never reused. Used as the tie-break
+            for rounding (§7.1) and for simplifying transfers (§7.3).
+        created_at:
+          $ref: "#/components/schemas/Timestamp"
+
+    ExpenseShare:
+      type: object
+      required: [id, expense_id, member_id, amount_cents]
+      properties:
+        id:
+          $ref: "#/components/schemas/Id"
+        expense_id:
+          $ref: "#/components/schemas/Id"
+        member_id:
+          $ref: "#/components/schemas/Id"
+        amount_cents:
+          type: integer
+          minimum: 0
+
+    Expense:
+      type: object
+      description: |
+        Invariant: the `amount_cents` of `shares` add up exactly to the expense's
+        `amount_cents`.
+      required:
+        - id
+        - group_id
+        - payer_member_id
+        - amount_cents
+        - description
+        - date
+        - split_type
+        - shares
+        - created_at
+        - updated_at
+      properties:
+        id:
+          $ref: "#/components/schemas/Id"
+        group_id:
+          $ref: "#/components/schemas/Id"
+        payer_member_id:
+          $ref: "#/components/schemas/Id"
+        amount_cents:
+          $ref: "#/components/schemas/AmountCents"
+        description:
+          type: string
+          minLength: 1
+          maxLength: 120
+        date:
+          $ref: "#/components/schemas/CalendarDate"
+        split_type:
+          $ref: "#/components/schemas/SplitType"
+        shares:
+          type: array
+          description: One stored row per participant, in ascending member `position`.
+          minItems: 1
+          maxItems: 8
+          items:
+            $ref: "#/components/schemas/ExpenseShare"
+        created_at:
+          $ref: "#/components/schemas/Timestamp"
+        updated_at:
+          $ref: "#/components/schemas/Timestamp"
+
+    Settlement:
+      type: object
+      required:
+        - id
+        - group_id
+        - from_member_id
+        - to_member_id
+        - amount_cents
+        - date
+        - created_at
+        - updated_at
+      properties:
+        id:
+          $ref: "#/components/schemas/Id"
+        group_id:
+          $ref: "#/components/schemas/Id"
+        from_member_id:
+          $ref: "#/components/schemas/Id"
+        to_member_id:
+          $ref: "#/components/schemas/Id"
+        amount_cents:
+          $ref: "#/components/schemas/AmountCents"
+        date:
+          $ref: "#/components/schemas/CalendarDate"
+        created_at:
+          $ref: "#/components/schemas/Timestamp"
+        updated_at:
+          $ref: "#/components/schemas/Timestamp"
+
+    Balance:
+      type: object
+      required: [member_id, net_cents]
+      description: |
+        `net = expenses paid − own shares + settlements paid − settlements
+        received` (§7.2). Positive means the group owes this member; negative
+        means they owe the group. A group's nets always add up to zero.
+      properties:
+        member_id:
+          $ref: "#/components/schemas/Id"
+        net_cents:
+          type: integer
+
+    Transfer:
+      type: object
+      required: [from_member_id, to_member_id, amount_cents]
+      description: "`from_member_id` owes, or should pay, `to_member_id`."
+      properties:
+        from_member_id:
+          $ref: "#/components/schemas/Id"
+        to_member_id:
+          $ref: "#/components/schemas/Id"
+        amount_cents:
+          type: integer
+          minimum: 1
+
+    GroupSnapshot:
+      type: object
+      required:
+        - group
+        - members
+        - expenses
+        - settlements
+        - balances
+        - suggested_transfers
+        - pairwise
+      properties:
+        group:
+          $ref: "#/components/schemas/Group"
+        members:
+          type: array
+          maxItems: 8
+          description: Ordered by ascending `position`.
+          items:
+            $ref: "#/components/schemas/Member"
+        expenses:
+          type: array
+          description: Newest first (`created_at` descending), each with its stored shares.
+          items:
+            $ref: "#/components/schemas/Expense"
+        settlements:
+          type: array
+          description: Newest first (`created_at` descending).
+          items:
+            $ref: "#/components/schemas/Settlement"
+        balances:
+          type: array
+          description: One entry per member, in ascending `position`, including zero balances.
+          items:
+            $ref: "#/components/schemas/Balance"
+        suggested_transfers:
+          type: array
+          description: |
+            Simplified settle-up (§7.3): greedy, largest debtor to largest
+            creditor, ties broken by ascending `position`, listed in the order
+            produced. Empty when everyone is settled.
+          items:
+            $ref: "#/components/schemas/Transfer"
+        pairwise:
+          type: array
+          description: |
+            Raw debts between pairs (§7.4), worked out from shares and
+            settlements only. There is at most one entry per unordered pair,
+            ordered by the members' positions; pairs whose debts cancel out are
+            left out.
+          items:
+            $ref: "#/components/schemas/Transfer"
+
+    # ------------------------------------------------------------- requests
+    CreateGroupInput:
+      type: object
+      required: [name, currency]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 60
+          description: Trimmed; must be 1–60 characters after trimming.
+        currency:
+          $ref: "#/components/schemas/Currency"
+
+    CreateGroupResult:
+      type: object
+      required: [code]
+      properties:
+        code:
+          $ref: "#/components/schemas/GroupCode"
+
+    MemberNameInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 40
+          description: Trimmed; must be 1–40 characters after trimming.
+
+    ShareInput:
+      type: object
+      required: [member_id, amount_cents]
+      properties:
+        member_id:
+          $ref: "#/components/schemas/Id"
+        amount_cents:
+          type: integer
+          minimum: 0
+          maximum: 100000000
+
+    ExpenseInput:
+      type: object
+      required:
+        - payer_member_id
+        - amount_cents
+        - description
+        - date
+        - split_type
+        - participant_ids
+      properties:
+        payer_member_id:
+          $ref: "#/components/schemas/Id"
+        amount_cents:
+          $ref: "#/components/schemas/AmountCents"
+        description:
+          type: string
+          minLength: 1
+          maxLength: 120
+          description: Trimmed; must be 1–120 characters after trimming.
+        date:
+          $ref: "#/components/schemas/CalendarDate"
+        split_type:
+          $ref: "#/components/schemas/SplitType"
+        participant_ids:
+          type: array
+          description: Who shares the cost. The payer does not have to be included.
+          minItems: 1
+          maxItems: 8
+          uniqueItems: true
+          items:
+            $ref: "#/components/schemas/Id"
+        exact_shares:
+          type: array
+          description: |
+            Required when `split_type` is `exact`: one entry per participant,
+            adding up exactly to `amount_cents`. Ignored for `equal`.
+          minItems: 1
+          maxItems: 8
+          items:
+            $ref: "#/components/schemas/ShareInput"
+      if:
+        properties:
+          split_type:
+            const: exact
+        required: [split_type]
+      then:
+        required: [exact_shares]
+
+    SettlementInput:
+      type: object
+      required: [from_member_id, to_member_id, amount_cents, date]
+      description: "`from_member_id` and `to_member_id` must be different members of this group."
+      properties:
+        from_member_id:
+          $ref: "#/components/schemas/Id"
+        to_member_id:
+          $ref: "#/components/schemas/Id"
+        amount_cents:
+          $ref: "#/components/schemas/AmountCents"
+        date:
+          $ref: "#/components/schemas/CalendarDate"
+
+    # --------------------------------------------------------------- errors
+    Error:
+      type: object
+      required: [detail]
+      properties:
+        detail:
+          type: string
+          description: A human-readable message the client can show as-is.
+
+    ValidationIssue:
+      type: object
+      required: [loc, msg, type]
+      properties:
+        loc:
+          type: array
+          items:
+            oneOf:
+              - type: string
+              - type: integer
+        msg:
+          type: string
+        type:
+          type: string
+
+    ValidationError:
+      type: object
+      required: [detail]
+      properties:
+        detail:
+          description: |
+            A single message for rules checked in application code, or FastAPI's
+            list of issues for schema validation failures.
+          oneOf:
+            - type: string
+            - type: array
+              items:
+                $ref: "#/components/schemas/ValidationIssue"

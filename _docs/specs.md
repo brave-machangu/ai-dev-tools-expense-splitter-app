@@ -1,6 +1,6 @@
-# Quits — Specification
+# ProRata — Specification
 
-**Working name:** Quits *(single point of change; swap here and in the repo README)*
+**Product:** ProRata — *Split expenses pro rata. Settle up in the fewest payments.*
 **Version:** 1.0 (v1 scope)
 **Status:** Approved for build
 
@@ -8,13 +8,13 @@
 
 ## 1. Overview
 
-Quits is a no-account web app for splitting shared costs within a small, short-lived
+ProRata is a no-account web app for splitting shared costs within a small, short-lived
 group — a trip, a weekend, a dinner series. One person creates a group and shares a
 link. Anyone with the link picks who they are from a list of typed-in names, adds
 expenses, and sees at a glance who owes whom and the shortest set of payments that
 would clear everyone out.
 
-The app **records** that a payment happened. It never moves money.
+ProRata **records** that a payment happened. It never moves money.
 
 ### Design posture
 
@@ -26,7 +26,7 @@ Three commitments shape every decision below:
    input through database column.
 3. **Determinism.** Given the same inputs, every derived number — per-person shares,
    balances, suggested transfers — is byte-identical on every recomputation. This is
-   what makes the app testable.
+   what makes ProRata testable.
 
 ---
 
