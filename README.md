@@ -83,3 +83,34 @@ There are no migrations yet, so after changing the schema, delete `backend/prora
 
 **Test database.** The suite drops and recreates every table in `TEST_DATABASE_URL`, so
 only use a database you're happy to lose. It refuses to run against `DATABASE_URL`.
+
+## How settle-up suggestions work
+
+Each person's net balance is what they paid, minus their shares, plus payments they made,
+minus payments they received. The suggested payments then match the largest debtor with
+the largest creditor, repeatedly, until everyone is at zero. Ties go to whoever was added
+to the group first, so the same data always gives the same suggestions.
+
+Exact optimisation requires searching over subsets of balances, which grows
+exponentially, so a greedy heuristic is used instead.
+
+The "Who owes whom" view shows the raw debts between each pair, worked out straight from
+expenses and payments without any combining, so the suggestions can be checked against it.
+
+## Known limitations
+
+These are deliberate decisions for v1 (see [`_docs/specs.md`](_docs/specs.md) §11):
+
+- **Anyone with the link has full access**, including deleting other people's expenses.
+  There are no accounts or roles: enforcing roles would need trustworthy identity, which
+  means authentication, and that is out of scope.
+- **Last write wins on concurrent edits.** If two browsers edit the same expense, the
+  second save silently overwrites the first. There is no version column, locking or
+  conflict screen; the 5-second refresh shows the losing browser the saved value within
+  seconds.
+- **Suggested payments come from a greedy method** and are not guaranteed to be the
+  fewest possible.
+- **Only currencies with exactly two decimal places are supported** (USD, EUR, GBP and 18
+  others). Currencies such as JPY, KRW or KWD aren't offered.
+- **No rate limiting.** Group codes can be guessed with enough attempts.
+- **Groups can't be deleted**, so they accumulate indefinitely.
